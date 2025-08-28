@@ -1,0 +1,109 @@
+sequenceDiagram
+    participant User as 사용자
+    participant Web as 경매심부름 웹
+    participant AdminPage as 어드민 페이지
+    participant Server as 경매심부름 서버
+    participant Manager as 관리자
+    participant Agent as 대리인
+
+    %% 1. 입찰 신청, 계약 및 결제
+    User->>Web: 경매 물건 검색 후 입찰 정보/개인정보 입력
+    Web->>Server: 계약 생성 요청
+    activate Server
+    Server->>Server: 계약 정보 임시 생성
+    Server-->>Web: 생성된 계약 정보 (서명 필요)
+    deactivate Server
+
+    User->>Web: 웹에서 계약서 내용 확인 및 서명
+    Web->>Server: 서명 정보 전송
+    
+    User->>Web: 결제하기
+    Web->>Server: 결제 처리 요청
+    activate Server
+    Server->>Server: 결제 정보 처리 및 계약 상태 업데이트
+    Note over Server: 결제 완료 시점
+    Server-->>Web: 결제 완료
+    deactivate Server
+    Web-->>User: 결제 완료 화면 표시
+
+    %% 2. 결제 완료 후 처리
+    Server->>User: [알림톡] '전자본인서명확인서' 제출 요청
+    Server->>Manager: [알림톡] 신규 결제 건 발생 알림
+
+    Manager->>AdminPage: 대리인 배정
+    AdminPage->>Server: 대리인 배정 정보 전송
+    activate Server
+    Server->>Agent: [알림톡] 신규 입찰 건 배정 (웹페이지 링크 포함)
+    Server->>User: [알림톡] 대리인 배정 완료 알림
+    deactivate Server
+
+    Agent->>Web: (알림톡 링크 통해) 배정된 경매 상세 페이지 접속
+    Agent->>Web: 서류 일괄 다운로드 요청
+    Web->>Server: 서류 일괄 다운로드 요청
+    activate Server
+    Note over Server: 필요 서류 4종 취합<br/>1. 기일입찰표<br/>2. 위임장<br/>3. 전자본인서명확인서<br/>4. 매수신청대리인등록증
+    Server-->>Web: 서류 모음 (ZIP 파일 등)
+    deactivate Server
+    Web-->>Agent: 파일 다운로드
+
+    %% 3. 문서 제출 및 입찰가 수정 (경매일 전일 20:00까지)
+    loop 경매일 전일 20:00까지
+        alt 사용자가 문서를 제출하는 경우
+            User->>Web: '전자본인서명확인서' 업로드
+            Web->>Server: 문서 업로드 정보 전송
+            activate Server
+            Server->>Server: 문서 유효성 검증 및 저장
+            Server->>User: [알림톡] 문서 제출 확인 완료
+            Server->>Agent: [알림톡] 사용자 서류 제출 완료 알림
+            deactivate Server
+        end
+
+        opt 사용자가 입찰금액을 수정하는 경우
+            User->>Web: 입찰금액 수정 요청
+            Web->>Server: 입찰금액 수정 정보 전송
+            activate Server
+            Server->>Server: 입찰금액 업데이트
+            Server->>Agent: [알림톡] 입찰금액 변경 알림
+            deactivate Server
+        end
+    end
+
+    %% 4. 최종 문서 제출 확인 및 자동 취소
+    Note over Server: 경매일 전일 20:00, 스케줄러 실행
+    Server->>Server: 최종 문서 제출 여부 확인
+    alt 문서가 최종적으로 미제출된 경우
+        Server->>Server: 대리 경매 자동 취소 처리
+        Server->>User: [알림톡] 문서 미제출로 인한 경매 자동 취소 안내
+        Server->>Agent: [알림톡] 담당 건 취소 알림
+    end
+
+    %% 5. 경매 당일 준비
+    Note over Server: 경매 당일 오전, 스케줄러 실행
+    Server->>Agent: [알림톡] 경매 당일 알림 (준비완료 요청)
+    
+    alt 대리인이 2시간 내에 준비완료 버튼을 누른 경우
+        Agent->>Web: (알림톡 링크 통해) 경매 준비 페이지 접속
+        Agent->>Web: '경매준비 완료' 버튼 클릭
+        Web->>Server: '경매준비 완료' 상태 전송
+        Server->>Server: 대리인 상태 업데이트
+        Note over Agent,Server: 경매 진행 대기
+    else 2시간 동안 응답이 없는 경우
+        Note over Server: 2시간 후, 스케줄러가 상태 재확인
+        Server->>Server: 대리인의 '준비완료' 상태 확인
+        opt '준비완료' 상태가 아닐 경우
+            Server->>Manager: [알림톡] 대리인 경매 준비 미완료 알림
+        end
+    end
+
+    %% 6. 경매 진행 및 결과 보고
+    Note over Agent,Server: (준비 완료 시) 경매 당일, 대리인이 경매 참여
+
+    Note over Server: 경매 당일 16:00, 스케줄러 실행
+    Server->>Agent: [알림톡] 경매 결과 입력 요청
+
+    Agent->>Web: (알림톡 링크 통해) 경매 결과 보고 (낙찰/패찰)
+    Web->>Server: 경매 결과 전송
+    activate Server
+    Server->>Server: 결과 저장 및 상태 업데이트
+    Server->>User: [알림톡] 경매 결과 안내
+    deactivate Server
