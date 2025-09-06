@@ -28,6 +28,7 @@ sequenceDiagram
 
     %% 2. 결제 완료 후 처리
     Server->>User: [알림톡] '전자본인서명확인서' 제출 요청
+    Server->>User: [알림톡] 보증금 안내 (금액 및 입금 방법)
     Server->>Manager: [알림톡] 신규 결제 건 발생 알림
 
     Manager->>AdminPage: 대리인 배정
@@ -46,7 +47,7 @@ sequenceDiagram
     deactivate Server
     Web-->>Agent: 파일 다운로드
 
-    %% 3. 문서 제출 및 입찰가 수정 (경매일 전일 20:00까지)
+    %% 3. 문서 제출, 보증금 수령 및 입찰가 수정 (경매일 전일 20:00까지)
     loop 경매일 전일 20:00까지
         alt 사용자가 문서를 제출하는 경우
             User->>Web: '전자본인서명확인서' 업로드
@@ -55,6 +56,17 @@ sequenceDiagram
             Server->>Server: 문서 유효성 검증 및 저장
             Server->>User: [알림톡] 문서 제출 확인 완료
             Server->>Agent: [알림톡] 사용자 서류 제출 완료 알림
+            deactivate Server
+        end
+
+        alt 대리인이 보증금을 수령한 경우
+            Note over User,Agent: 사용자가 대리인에게 보증금 입금
+            Agent->>Web: (계약 내역 페이지) 보증금 수령 확인 처리
+            Web->>Server: 보증금 수령 확인 정보 전송
+            activate Server
+            Server->>Server: 보증금 수령 상태 업데이트
+            Server->>User: [알림톡] 보증금 수령 확인 완료
+            Server->>Agent: [알림톡] 보증금 수령 처리 완료 알림
             deactivate Server
         end
 
