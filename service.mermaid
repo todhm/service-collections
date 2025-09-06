@@ -28,7 +28,6 @@ sequenceDiagram
 
     %% 2. 결제 완료 후 처리
     Server->>User: [알림톡] '전자본인서명확인서' 제출 요청
-    Server->>User: [알림톡] 보증금 안내 (금액 및 입금 방법)
     Server->>Manager: [알림톡] 신규 결제 건 발생 알림
 
     Manager->>AdminPage: 대리인 배정
@@ -36,6 +35,7 @@ sequenceDiagram
     activate Server
     Server->>Agent: [알림톡] 신규 입찰 건 배정 (웹페이지 링크 포함)
     Server->>User: [알림톡] 대리인 배정 완료 알림
+    Server->>User: [알림톡] 보증금 안내 (대리인 계좌 정보 포함)
     deactivate Server
 
     Agent->>Web: (알림톡 링크 통해) 배정된 경매 상세 페이지 접속
